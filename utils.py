@@ -32,7 +32,7 @@ def get_correlation_pairs(tfidf: pd.DataFrame, corr_type: str) -> pd.DataFrame:
     return correlations_stacked
 
 
-def combone_pairs(X: pd.DataFrame, strong_corr_pairs: List[str]) -> pd.DataFrame:
+def combine_pairs(X: pd.DataFrame, strong_corr_pairs: List[str]) -> pd.DataFrame:
     droped = []
     for pair in strong_corr_pairs:
         pair_splited = pair.split("_")
@@ -45,9 +45,6 @@ def combone_pairs(X: pd.DataFrame, strong_corr_pairs: List[str]) -> pd.DataFrame
 
 
 def calc_strong_pairs(tfidf_sk: pd.DataFrame, threshold: float, plot: bool = False):
-    # correlations_pearson = get_correlation_pairs(tfidf_sk, "pearson").to_frame().rename(columns={0: "pearson"})
-    # correlations_spearman = get_correlation_pairs(tfidf_sk, "spearman").to_frame().rename(columns={0: "spearman"})
-    # correlations_stacked = (correlations_pearson.join(correlations_spearman))
     correlations_stacked = get_correlation_pairs(
         tfidf_sk, "pearson").to_frame().rename(columns={0: "pearson"}).join(
         get_correlation_pairs(tfidf_sk, "spearman").to_frame().rename(columns={0: "spearman"})
@@ -55,14 +52,16 @@ def calc_strong_pairs(tfidf_sk: pd.DataFrame, threshold: float, plot: bool = Fal
     correlations_stacked = correlations_stacked.iloc[range(0, len(correlations_stacked), 2)]
     correlations_stacked.index = ["_".join(pair) for pair in correlations_stacked.index.to_list()]
 
-    strong_corr = []
-    for cor in ["pearson", "spearman"]:
-        strong_corr.extend(
-            correlations_stacked[cor].sort_values(ascending=False)
-        .head(threshold)
-        .index.to_list()
-        )
-    strong_corr_pairs = list(set(strong_corr))
+    # strong_corr = []
+    # for cor in ["pearson", "spearman"]:
+    #     strong_corr.extend(
+    #         correlations_stacked[cor].sort_values(ascending=False)
+    #     .head(threshold)
+    #     .index.to_list()
+    #     )
+
+    strong_corr_pairs = correlations_stacked.query("pearson > @threshold").index.to_list()
+    strong_corr = strong_corr_pairs
 
     if plot:
         correlations_stacked_plot = correlations_stacked.loc[strong_corr].reset_index().sort_values("pearson")
@@ -139,19 +138,20 @@ def run_transformer(X: pd.DataFrame, transformer = None) -> Union[TfidfTransform
     )
     return transformer, tfidf_sk
 
-def plot_prediction_distribution(clf, X, y):
+
+def plot_prediction_distribution(clf, X, y, threshold: float):
     fig = go.Figure()
     fig.add_trace(go.Histogram(x=clf.predict_proba(X[y==1])[:, 1], name="positive"))
     fig.add_trace(go.Histogram(x=clf.predict_proba(X[y==0])[:, 1], name="negetive"))
 
     fig.add_trace(
         go.Scatter(
-            x=[y.mean(), y.mean()],
+            x=[threshold, threshold],
             y= [0, 50],
             mode='lines', name='lines')
     )
 
     fig.update_layout(barmode='overlay')
     fig.update_traces(opacity=0.75)
-    print(f"Acuuracy score {accuracy_score(y, clf.predict_proba(X)[:, 1] > y.mean())}")
+    print(f"Acuuracy score {accuracy_score(y, clf.predict_proba(X)[:, 1] > threshold)}")
     fig.show()
